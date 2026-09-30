@@ -1,7 +1,142 @@
 generator client {
-  provider = "prisma-client"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+enum SkillType {
+  TEACH
+  LEARN
+}
+
+enum SessionStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum CreditTransactionType {
+  EARN
+  SPEND
+  HOLD
+  RELEASE
+  REFUND
+}
+
+model User {
+  id    String  @id @default(cuid())
+  email String  @unique
+  name  String?
+  image String?
+  bio   String?
+
+  credits Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  skills           UserSkill[]
+  teachingSessions Session[]   @relation("TeacherSessions")
+  learningSessions Session[]   @relation("LearnerSessions")
+
+  reviewsGiven    Review[] @relation("ReviewsGiven")
+  reviewsReceived Review[] @relation("ReviewsReceived")
+
+  transactions CreditTransaction[]
+}
+
+model Skill {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  users    UserSkill[]
+  sessions Session[]
+}
+
+model UserSkill {
+  id   String    @id @default(cuid())
+  type SkillType
+
+  userId  String
+  skillId String
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, skillId, type])
+  @@index([skillId, type])
+}
+
+model Session {
+  id String @id @default(cuid())
+
+  teacherId String
+  learnerId String
+  skillId   String
+
+  startTime DateTime
+  endTime   DateTime
+
+  credits Int           @default(1)
+  status  SessionStatus @default(PENDING)
+
+  meetingUrl String?
+
+  teacher User  @relation("TeacherSessions", fields: [teacherId], references: [id])
+  learner User  @relation("LearnerSessions", fields: [learnerId], references: [id])
+  skill   Skill @relation(fields: [skillId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions CreditTransaction[]
+  review       Review?
+
+  @@index([teacherId])
+  @@index([learnerId])
+  @@index([skillId])
+  @@index([startTime])
+}
+
+model CreditTransaction {
+  id String @id @default(cuid())
+
+  userId    String
+  sessionId String?
+
+  type   CreditTransactionType
+  amount Int
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session Session? @relation(fields: [sessionId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([sessionId])
+}
+
+model Review {
+  id String @id @default(cuid())
+
+  sessionId  String @unique
+  reviewerId String
+  revieweeId String
+
+  rating  Int
+  comment String?
+
+  session  Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  reviewer User    @relation("ReviewsGiven", fields: [reviewerId], references: [id])
+  reviewee User    @relation("ReviewsReceived", fields: [revieweeId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([revieweeId])
 }
